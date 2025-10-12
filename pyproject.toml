@@ -1,0 +1,11 @@
+[project]
+name = "sn-a2a"
+version = "0.1.0"
+description = "Simple CLI Test for ServiceNow A2A"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "a2a-sdk>=0.3.8",
+    "httpx>=0.28.1",
+    "python-dotenv>=1.1.1",
+]
