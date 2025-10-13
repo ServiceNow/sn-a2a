@@ -1,37 +1,129 @@
 # Summary: ServiceNow A2A Agent Testing
 
-## Problem Discovered
+## Current Status: BLOCKED ⚠️
 
-The **"Categorize ITSM incident AI agent"** on ServiceNow has a **mandatory requirement for push notifications** that makes it incompatible with simple CLI tools or the current A2A Inspector implementation.
+The integration is blocked by a **contradictory push notification requirement** from the ServiceNow agent.
 
-### Root Cause
+## Critical Issue: Push Notification Contradiction
 
-The agent's capabilities show:
+### Error Messages
+
+The ServiceNow agent returns **contradictory errors** depending on whether push notifications are included in the request:
+
+**Error #1 - Without Push Notification URL:**
+```
+Script: sn_aia.AIAgentProviderA2AUtil: AIAgentProviderA2AUtil faced error with code: -32602
+message: Invalid method parameters: Push Notification URL is required for asynchronous requests
+method: _validateParams
+```
+
+**Error #2 - With Push Notification URL:**
+```
+Script: sn_aia.AIAgentProviderA2AUtil: AIAgentProviderA2AUtil faced error with code: -32003
+message: Push Notification is not supported
+method: _handleTaskSend
+```
+
+### The Problem
+
+The system oscillates between these two contradictory errors:
+- **WITHOUT** `pushNotificationConfig` → Error -32602: "Push Notification URL is required"
+- **WITH** `pushNotificationConfig` → Error -32003: "Push Notification is not supported"
+
+This suggests a **configuration mismatch** on the ServiceNow server side where:
+1. The agent card advertises `"pushNotifications": true` in capabilities
+2. The validation layer (`_validateParams`) requires push notification URL
+3. The execution layer (`_handleTaskSend`) rejects push notifications as unsupported
+
+## Issues Resolved
+
+### Issue #1: Invalid acceptedOutputModes (RESOLVED - 2025-10-12)
+
+**Error Message:**
+```
+Script: sn_aia.AIAgentProviderA2AUtil: AIAgentProviderA2AUtil faced error with code: -32602
+message: Invalid method parameters: Invalid acceptedOutputModes value
+```
+
+**Root Cause:**
+The A2A Inspector was requesting output modes the ServiceNow agent doesn't support:
+```python
+# WRONG - backend/app.py:344 (before fix)
+accepted_output_modes=['text/plain', 'video/mp4', 'application/json']
+```
+
+The ServiceNow agent only supports:
 ```json
-"capabilities": {
-  "streaming": false,
-  "pushNotifications": true,
-  "stateTransitionHistory": false
+"defaultOutputModes": ["application/json"]
+```
+
+**Fix Applied:**
+Updated [backend/app.py:344](../a2a-inspector/backend/app.py#L344) to only request supported modes:
+```python
+# CORRECT - backend/app.py:344 (after fix)
+acceptedOutputModes=['application/json']
+```
+
+## Sample Payloads
+
+### Payload WITHOUT Push Notification Config (Results in Error -32602)
+```json
+{
+  "id": "msg-1760334652965-walfvwh96",
+  "jsonrpc": "2.0",
+  "method": "message/send",
+  "params": {
+    "configuration": {
+      "acceptedOutputModes": ["application/json"]
+    },
+    "message": {
+      "kind": "message",
+      "messageId": "msg-1760334652965-walfvwh96",
+      "metadata": {},
+      "parts": [
+        {
+          "kind": "text",
+          "text": "Categorize ITSM Incident INC0019104"
+        }
+      ],
+      "role": "user"
+    }
+  }
 }
 ```
 
-This means:
-- The agent operates **asynchronously**
-- It **requires** a `push_notification_url` in the message configuration
-- Responses are sent via HTTP POST callback, not returned synchronously
-- The server must be publicly accessible for the agent to send callbacks
+**Result:** Error -32602: "Push Notification URL is required for asynchronous requests"
 
-### Error Encountered
-
+### Payload WITH Push Notification Config (Results in Error -32003)
+```json
+{
+  "id": "msg-1760334652965-walfvwh96",
+  "jsonrpc": "2.0",
+  "method": "message/send",
+  "params": {
+    "configuration": {
+      "acceptedOutputModes": ["application/json"],
+      "pushNotificationConfig": {
+        "url": "https://634585affe67.ngrok-free.app/push-notification"
+      }
+    },
+    "message": {
+      "kind": "message",
+      "messageId": "msg-1760334652965-walfvwh96",
+      "metadata": {},
+      "parts": [
+        {
+          "kind": "text",
+          "text": "Categorize ITSM Incident INC0019104"
+        }
+      ],
+      "role": "user"
+    }
+  }
+}
 ```
-400 Bad Request
-"Invalid method parameters: Push Notification URL is required for asynchronous requests"
-```
 
-Even when we add `push_notification_url: "http://127.0.0.1:5001/push-notification"`, the ServiceNow agent likely:
-1. Validates that the URL is publicly accessible
-2. Rejects localhost URLs
-3. Requires HTTPS URLs
+**Result:** Error -32003: "Push Notification is not supported"
 
 ## What Works
 
@@ -39,12 +131,8 @@ Even when we add `push_notification_url: "http://127.0.0.1:5001/push-notificatio
 ✅ **Agent Card Retrieval** - Can fetch agent metadata and capabilities
 ✅ **Authentication** - OAuth scope `a2aauthscope` properly configured
 ✅ **A2A Inspector Backend** - Server runs and handles connections
-
-## What Doesn't Work
-
-❌ **Sending Messages** - Agent rejects requests without valid push notification URL
-❌ **Local Testing** - localhost URLs not acceptable for callbacks
-❌ **Simple CLI** - Cannot receive async callbacks without a server
+✅ **acceptedOutputModes Fixed** - Now correctly sends only `["application/json"]`
+✅ **Payload Construction** - Properly formatted JSON-RPC 2.0 requests
 
 ## Solutions
 
@@ -85,9 +173,18 @@ The existing [langgraph-agent-dev](../agenticai/langgraph-agent-dev/main.py) app
 
 ## Recommended Next Steps
 
-1. **Try ngrok approach** (fastest for testing)
-2. **Check if existing langgraph agent works** and how it's configured
-3. **Contact ServiceNow admin** to understand agent requirements
+1. **Contact ServiceNow Admin** - This is a **server-side configuration issue** that must be fixed by the ServiceNow team:
+   - The agent card claims `"pushNotifications": true` but the backend rejects push notifications
+   - Either enable full push notification support OR update agent card to `"pushNotifications": false`
+   - The validation layer (`_validateParams`) and execution layer (`_handleTaskSend`) are inconsistent
+
+2. **Check AIAgentProviderA2AUtil.js** - The ServiceNow script has conflicting logic:
+   - `_validateParams` method requires push notification URL when `pushNotifications: true`
+   - `_handleTaskSend` method rejects requests with push notification config
+
+3. **Investigate existing working implementations** - Check if other clients successfully connect:
+   - How does the [langgraph-agent-dev](../agenticai/langgraph-agent-dev/main.py) handle this agent?
+   - Are there other A2A clients that work with this ServiceNow instance?
 
 ## Files Created
 
@@ -100,8 +197,10 @@ The existing [langgraph-agent-dev](../agenticai/langgraph-agent-dev/main.py) app
 
 ## Key Learnings
 
-1. **Always check agent capabilities** before implementing clients
-2. **Push notifications require publicly accessible endpoints**
-3. **The A2A SDK handles many details**, but can't work around agent requirements
-4. **Local development with async agents needs tunneling tools**
-5. **This specific ServiceNow agent is designed for production server-to-server communication**
+1. **Always check agent capabilities** before implementing clients - Review `defaultOutputModes` in agent card
+2. **Match acceptedOutputModes to agent's capabilities** - ServiceNow validates this strictly on the server side
+3. **Push notifications require publicly accessible endpoints** - Use ngrok for local development
+4. **The A2A SDK handles many details**, but can't work around agent requirements
+5. **Local development with async agents needs tunneling tools**
+6. **Server-side validation errors** (like -32602 Invalid Params) often mean parameter mismatch with agent card specs
+7. **This specific ServiceNow agent is designed for production server-to-server communication**

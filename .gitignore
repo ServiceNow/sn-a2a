@@ -1,4 +1,5 @@
 # Environment variables containing secrets
+AIAgentProviderA2AUtil.js
 .env
 .env.local
 .env.*.local
