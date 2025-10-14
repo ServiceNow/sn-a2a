@@ -7,7 +7,8 @@ The a2a-inspector is a web-based tool that provides a full interface for testing
 ### 1. Navigate to the A2A Inspector Directory
 
 ```bash
-cd /Users/vamsee.lakamsani/git/snc/main/itom-x/ml/a2a-inspector
+git pull https://github.com/a2aproject/a2a-inspector
+cd a2a-inspector
 ```
 
 ### 2. Install Dependencies (if not already done)
