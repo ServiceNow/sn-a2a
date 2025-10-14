@@ -34,6 +34,8 @@ A simple command-line interface to communicate with the "Categorize ITSM Inciden
    ```bash
    uv sync
    ```
+4. **Run it**:
+* CLI loop: `uv run python main.py`
 
 ## Security Notes
 

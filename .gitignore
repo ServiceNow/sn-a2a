@@ -1,5 +1,4 @@
 # Environment variables containing secrets
-AIAgentProviderA2AUtil.js
 .env
 .env.local
 .env.*.local
@@ -51,3 +50,8 @@ htmlcov/
 
 # UV
 uv.lock
+
+#misc
+AIAgentProviderA2AUtil.js
+test-curl.txt
+XLinks.md

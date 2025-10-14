@@ -2,16 +2,12 @@
 
 import asyncio
 import os
-from uuid import uuid4
 
 import httpx
 from dotenv import load_dotenv
 
-from a2a.client import A2ACardResolver, A2AClient
-from a2a.types import (
-    MessageSendParams,
-    SendMessageRequest,
-)
+from a2a.client import A2ACardResolver, ClientConfig, ClientFactory, create_text_message_object
+from a2a.types import Message, Task
 
 
 async def refresh_token(
@@ -106,8 +102,14 @@ async def main():
             print(f"Error connecting to agent: {e}")
             return
 
-        # Initialize A2A client
-        client = A2AClient(httpx_client=httpx_client, agent_card=agent_card)
+        # Initialize A2A client using ClientFactory
+        # Set accepted_output_modes to "application/json" as required by ServiceNow backend
+        config = ClientConfig(
+            httpx_client=httpx_client,
+            accepted_output_modes=["application/json"]
+        )
+        factory = ClientFactory(config)
+        client = factory.create(agent_card)
 
         # Track context for conversation continuity
         context_id = None
@@ -133,52 +135,46 @@ async def main():
             if not user_input:
                 continue
 
-            # Prepare message payload
-            send_message_payload = {
-                "message": {
-                    "role": "user",
-                    "parts": [{"kind": "text", "text": user_input}],
-                    "messageId": uuid4().hex,
-                }
-            }
+            # Create message using helper
+            message = create_text_message_object(content=user_input)
 
             # Add context_id if we have one from a previous exchange
             if context_id:
-                send_message_payload["message"]["contextId"] = context_id
+                message.context_id = context_id
 
             # Send message to agent
             try:
-                request = SendMessageRequest(
-                    id=str(uuid4()), params=MessageSendParams(**send_message_payload)
-                )
-                response = await client.send_message(request)
+                # The new API returns an async iterator of events
+                response_text_parts = []
+                task = None
 
-                # Extract result from response
-                result_obj = (
-                    getattr(response, "result", None)
-                    or getattr(response, "root", None).result
-                )
+                async for event in client.send_message(message):
+                    if isinstance(event, Message):
+                        # Handle message response
+                        for part in event.parts:
+                            if hasattr(part.root, "text"):
+                                response_text_parts.append(part.root.text)
+                    elif isinstance(event, tuple) and len(event) == 2:
+                        # Handle (Task, UpdateEvent) tuple
+                        task, update_event = event
+                        if task.status and task.status.message:
+                            for part in task.status.message.parts:
+                                if hasattr(part.root, "text"):
+                                    response_text_parts.append(part.root.text)
 
                 # Update context_id for conversation continuity
-                new_context_id = getattr(result_obj, "context_id", None)
-                status_state = getattr(result_obj.status, "state", None)
+                if task:
+                    new_context_id = getattr(task, "context_id", None)
+                    status_state = getattr(task.status, "state", None) if task.status else None
 
-                # Clear context if conversation is completed
-                if status_state == "completed":
-                    context_id = None
-                else:
-                    context_id = new_context_id
-
-                # Extract response text from message parts
-                status_msg = result_obj.status.message
-                parts = status_msg.parts
-                response_text = "\n".join(
-                    getattr(part.root, "text", "")
-                    for part in parts
-                    if hasattr(part, "root") and hasattr(part.root, "text")
-                )
+                    # Clear context if conversation is completed
+                    if status_state == "completed":
+                        context_id = None
+                    else:
+                        context_id = new_context_id
 
                 # Print agent response
+                response_text = "\n".join(response_text_parts)
                 print(f"\nAgent: {response_text}\n")
 
             except Exception as e:
