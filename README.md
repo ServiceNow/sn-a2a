@@ -44,15 +44,8 @@ A simple command-line interface to communicate with the "Categorize ITSM Inciden
 - Use `.env.example` as a template (contains no real credentials)
 - Refresh tokens are valid for 100 days; access tokens expire in 30 minutes
 
-## Important Limitation
 
-⚠️ **The simple CLI (main.py) cannot work with this ServiceNow agent** because:
-
-- The agent requires **push notifications** for asynchronous responses
-- It needs a publicly accessible HTTPS URL to send callbacks
-- A simple CLI cannot provide this infrastructure
-
-## Recommended Approach
+## Future Testing with Push notifications
 
 Use the **A2A Inspector** web-based tool instead, which supports push notifications via ngrok:
 
@@ -61,12 +54,8 @@ See [TESTING_WITH_A2A_INSPECTOR.md](./TESTING_WITH_A2A_INSPECTOR.md) for complet
 ## Files in This Project
 
 - `main.py` - Simple CLI (blocked by push notification requirement)
-- `test_cli.py` - Test script with token refresh functionality
-- `test_direct.py` - Direct HTTP testing for debugging
-- `test_with_inspector_api.py` - Inspector backend API testing
 - `.env.example` - Template for environment variables (no secrets)
 - `.env` - Your actual credentials (**git-ignored**)
-- `SUMMARY.md` - Complete problem analysis and solutions
 - `TESTING_WITH_A2A_INSPECTOR.md` - How to use the web-based inspector
 
 ## Contributing
