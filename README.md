@@ -37,6 +37,26 @@ A simple command-line interface to communicate with the "Categorize ITSM Inciden
 4. **Run it**:
 * CLI loop: `uv run python main.py`
 
+Output with a prompt like `Categorize ITSM Incident INC0019104` looks roughly like this: 
+
+```
+Using existing auth token from A2A_CLIENT_AUTH_TOKEN...
+
+Connecting to Categorize ITSM Incident Agent...
+Connected to agent: Categorize ITSM incident AI agent
+Description: Categorize ITSM incident AI agent assigns appropriate category and subcategory to an incident.
+
+Type your question (e.g., 'Categorize ITSM Incident INC0019104')
+Type 'quit' or 'exit' to end the session
+
+You: Categorize ITSM Incident INC0019104
+
+Agent: **Recommended incident (INC0019104) categorization details:**
+- Category: Software (Reason: The incident is about being unable to log in to the rewards/benefits portal, which is a software/application access issue.)
+- Subcategory: Not determined (Reason: None of the available subcategories—Email or Operating System—directly match the portal login issue.)
+Task has been completed
+```
+
 ## Security Notes
 
 - **Never commit `.env` files** - they contain secrets!
