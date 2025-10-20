@@ -1,19 +1,18 @@
 # ServiceNow A2A CLI
 
-A simple command-line interface to communicate with the "Categorize ITSM Incident Agent" using the A2A (Agent-to-Agent) protocol.
+A simple command-line interface to communicate with remotely with ServiceNoW AI agents using the A2A (Agent-to-Agent) protocol.
 
 ## Features
 
-- Direct A2A protocol communication with ServiceNow incident categorization agent
+- Direct A2A protocol communication with ServiceNow AI Agents running in a Glide instance.
 - OAuth token refresh function for secure authentication
-- Context-aware multi-turn conversations
 - Simple setup using UV package manager
 
 ## Prerequisites
 
 - Python 3.11 or higher
 - UV package manager
-- ServiceNow instance with A2A agent configured
+- ServiceNow instance with A2A agent and [OAuth](https://www.servicenow.com/docs/bundle/zurich-platform-security/page/integrate/authentication/concept/new-inbound-integrations.html) configured
 - OAuth credentials with `a2aauthscope` permission
 
 ## Setup
@@ -37,7 +36,7 @@ A simple command-line interface to communicate with the "Categorize ITSM Inciden
 4. **Run it**:
 * CLI loop: `uv run python main.py`
 
-Output with a prompt like `Categorize ITSM Incident INC0019104` looks roughly like this: 
+Output with a prompt like `Categorize ITSM Incident INC0019104` (AI Agent sysid `900cf9f09f4f1210579fa9e9d90a1c4a`) looks roughly like this: 
 
 ```
 Using existing auth token from A2A_CLIENT_AUTH_TOKEN...
